@@ -19,6 +19,7 @@ __all__ = [
     'ungettext', 'ungettext_lazy',
     'pgettext', 'pgettext_lazy',
     'npgettext', 'npgettext_lazy',
+    'I18nRealBackend', 'I18nNullBackend'
 ]
 
 # Here be dragons, so a short explanation of the logic won't hurt:
@@ -28,6 +29,48 @@ __all__ = [
 # a reference to one of these functions, don't break that reference when we
 # replace the functions with their real counterparts (once we do access the
 # settings).
+
+class I18nRealBackend(object):
+    """
+    i18n backend to be used when settings.USE_I18N == True.
+    This class can also be subclassed to build a custom
+    i18n real backend.
+    """
+    def __getattr__(self, real_name):
+        from django.utils.translation import trans_real
+        return getattr(trans_real, real_name)
+
+class I18nNullBackend(object):
+    """
+    i18n backend to be used when settings.USE_I18N != True.
+    This class can also be subclassed to build a custom
+    i18n null backend.
+    """
+    def __getattr__(self, real_name):
+        from django.utils.translation import trans_null
+        return getattr(trans_null, real_name)
+
+def get_i18n_backend(i18n_backend_name, settings):
+    """
+    Get i18n backend object from settings variables:
+    - I18N_BACKEND_REAL
+    - I18N_BACKEND_NULL
+
+    Args:
+        i18n_backend_name: A string, either I18N_BACKEND_REAL or
+            I18N_BACKEND_NULL
+        settings: django.conf.settings
+    Returns:
+        An i18n backend object
+    """
+    i18n_class = getattr(settings, i18n_backend_name)
+    i18n_path = i18n_class.split('.')
+    if len(i18n_path) > 1:
+        i18n_module_name = '.'.join(i18n_path[:-1])
+    else:
+        i18n_module_name = '.'
+    i18n_module = __import__(i18n_module_name, {}, {}, i18n_path[-1])
+    return getattr(i18n_module, i18n_path[-1])()
 
 class Trans(object):
     """
@@ -41,13 +84,16 @@ class Trans(object):
     performance effect, as access to the function goes the normal path,
     instead of using __getattr__.
     """
-
-    def __getattr__(self, real_name):
+    def get_trans(self):
         from django.conf import settings
         if settings.USE_I18N:
-            from django.utils.translation import trans_real as trans
+            i18n_backend_name = 'I18N_BACKEND_REAL'
         else:
-            from django.utils.translation import trans_null as trans
+            i18n_backend_name = 'I18N_BACKEND_NULL'
+        return get_i18n_backend(i18n_backend_name, settings)
+
+    def __getattr__(self, real_name):
+        trans = self.get_trans()
         setattr(self, real_name, getattr(trans, real_name))
         return getattr(trans, real_name)
 

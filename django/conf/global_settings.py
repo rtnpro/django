@@ -562,6 +562,10 @@ DEFAULT_EXCEPTION_REPORTER_FILTER = 'django.views.debug.SafeExceptionReporterFil
 # The name of the class to use to run the test suite
 TEST_RUNNER = 'django.test.simple.DjangoTestSuiteRunner'
 
+# The name of the class to use as i18n backend
+I18N_BACKEND_REAL = 'django.utils.translation.I18nRealBackend'
+I18N_BACKEND_NULL = 'django.utils.translation.I18nNullBackend'
+
 ############
 # FIXTURES #
 ############
